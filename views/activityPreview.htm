@@ -1,0 +1,17 @@
+<div
+    {% if class %}
+        class="{{ class }}"
+    {% endif %}
+>
+    <div class="friends-badge preview">
+        <img src="{{model.image.path}}" />
+        <h4>{{ model.title }}</h4>
+        <div class="description">
+            {{ model.excerpt|raw }}
+        </div>
+        <a href="#" data-activity-code="{{model.activity_code}}">Do This</a>
+        <div class="earned">
+            {{ model.timeAgo }}
+        </div>
+    </div>
+</div>
