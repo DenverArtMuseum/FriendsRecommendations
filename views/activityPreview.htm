@@ -3,15 +3,16 @@
         class="{{ class }}"
     {% endif %}
 >
-    <div class="friends-badge preview">
-        <img src="{{model.image.path}}" />
-        <h4>{{ model.title }}</h4>
-        <div class="description">
+    <div class="friends-activity preview" data-categories="{% for category in model.categories %}{{category.slug}} {% endfor %}">
+        <a class="do-btn icon-plus-square-o" href="#" data-activity-code="{{model.activity_code}}"></a>
+        {% if model.image.path %}
+            <a href="/activity/{{model.id}}"><img src="{{model.image.path}}" /></a>
+        {% else %}
+            <a href="/activity/{{model.id}}"><img src="" /></a>
+        {% endif %}
+        <h4><a href="/activity/{{model.id}}">{{ model.title }}</a></h4>
+        <!-- <div class="description">
             {{ model.excerpt|raw }}
-        </div>
-        <a href="#" data-activity-code="{{model.activity_code}}">Do This</a>
-        <div class="earned">
-            {{ model.timeAgo }}
-        </div>
+        </div> -->
     </div>
 </div>
