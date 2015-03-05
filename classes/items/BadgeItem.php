@@ -2,8 +2,7 @@
 
 use Log;
 use DMA\Recommendations\Classes\Items\ItemBase;
-
-
+use Carbon\Carbon;
 
 /**
  * Badge Item 
@@ -20,8 +19,8 @@ class BadgeItem extends ItemBase
     public function getDetails()
     {
         return [
-                'name' => 'Badges',
-                'description' => 'Recommend badges base on tags and user activity.'
+			'name' => 'Badges',
+			'description' => 'Recommend badges base on tags and user activity.'
         ];
     }    
     
@@ -49,7 +48,7 @@ class BadgeItem extends ItemBase
 	 */
 	public function getQueryScope()
 	{
-		return parent::getQueryScope()->where('is_published', true);
+		return parent::getQueryScope()->isActive();
 	}	
 	
 	/**
@@ -68,7 +67,7 @@ class BadgeItem extends ItemBase
 	public function getFeatures()
 	{
 	    return [
-	        'users',	        
+	        ['users',      'type' => 'string', 'index' => 'not_analyzed'],   
             'categories',
 	    ];
 	}
@@ -80,7 +79,8 @@ class BadgeItem extends ItemBase
 	public function getFilters()
 	{
 		return [
-		  ['time_restrictions', 'type' => 'object']
+		  ['time_restrictions', 'type' => 'object'],
+		  ['is_active',  'type' => 'boolean' ]
         ];
 	}	
   
@@ -123,7 +123,8 @@ class BadgeItem extends ItemBase
 		
 	
 	// PREPARE DATA METHODS
-	public function getCategories($model){
+	public function getCategories($model)
+	{
 	
 		$clean = [];
 		$model->categories->each(function($r) use (&$clean){
@@ -133,8 +134,15 @@ class BadgeItem extends ItemBase
 		return $clean;
 	
 	}	
+
+	public function getIsActive($model)
+	{
+	    return (!$model->is_archived && $model->is_published);
+	}
 	
-	public function getTimeRestrictions($model){
+	
+	public function getTimeRestrictions($model)
+	{
 	
 	    $restrictions = [];
 	    $keys         = ['date_begin', 'date_end'];
@@ -170,23 +178,31 @@ class BadgeItem extends ItemBase
 	
 	public function filterTimeRestrictions($backend)
 	{
-	$today = new Carbon();
 	
-	// Split date and time
-	$date = $today->toDateString();
-	$time = $today->toTimeString();
-	
-	// Filters using SOLR syntax. ElasticSearch DSL can
-	// be used if the return value is an Array
-	
-    $filter = "( time_restrictions.date_begin:[ * TO now ] AND
-	time_restrictions.date_end:[ now TO * ] )";
-	
-	// Clean up string
-	$filter = str_replace(["\n","\r"], '', $filter);
-	$filter = $this->normalizeWhiteSpace($filter);
-	return $filter;
-	
-	
-	}	
+    	// Filters using SOLR syntax. ElasticSearch DSL can
+    	// be used if the return value is an Array
+    	
+        // Include date_begin that have a value a complain with the rule
+        // and also include date_being that is null ( assuming null = don't have begin restrictions ) 
+        $filter  = "( time_restrictions.date_begin:[ * TO now ] OR
+                     _missing_:time_restrictions.date_begin )";
+    
+        $filter .= ' AND ';
+    
+        // Include date_end that have a value a complain with the rule
+        // and also include date_end that is null ( assuming null = don't have end restrictions )
+        $filter .= "( time_restrictions.date_end:[ now TO * ] OR
+                     _missing_:time_restrictions.date_end )";
+
+    	return $filter;
+    	
+	}
+
+	public function filterIsActive($backend)
+	{
+	    // Because there are badge without time restricitons but they are archived or not published
+	    // is better exclude them as well.
+	    $filter = '( is_active:true )';
+	    return $filter;
+	}
 }

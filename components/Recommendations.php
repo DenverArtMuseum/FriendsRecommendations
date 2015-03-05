@@ -78,15 +78,10 @@ class Recommendations extends ComponentBase
     
     protected function getRecomendations()
     {   
-        
-        //var_dump('running');
-        // var_dump($this->alias);
-        
+               
         $user = $this->getUser();
         $key  = $this->property('recommend');
         
-        // var_dump($key);
-
         // Use define limit or global limit
         $limit = $this->property('limit');
         if (empty($limit) || $limit <= 0){
@@ -175,6 +170,7 @@ class Recommendations extends ComponentBase
     	$this->prepareVars();
     
     }    
+
    
     ###
     # OPTIONS
@@ -202,6 +198,14 @@ class Recommendations extends ComponentBase
     	];
     }  
 
+    /*
+    * TODO : The following methods onRenderBadge, onBookmarkAdd,
+    * onBookmarkRemove, loadBadge, should not be here.
+    * they provide a specific bussines logic. A solution
+    * will be create a badge component so they have they our controller 
+    * so the AJAX handlers can work. 
+    * This component should use the trait \DMA\Recommendations\Traits\MultipleComponents
+    */
     public function onRenderBadge()
     {
         $id = post('id');
