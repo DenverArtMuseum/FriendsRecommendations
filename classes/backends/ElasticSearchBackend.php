@@ -570,6 +570,14 @@ class ElasticSearchBackend extends BackendBase
         foreach($itemfilters as $filter) {
             $filters['and']['filters'][] = $filter; 
         }
+
+        // OMG! It works
+        // Test the idea of category FIlters (very much not permanent)
+        $filters['and']['filters'][] = [
+            'terms' => [
+                'categories' => ['Create and Do','Unexpected']
+            ]
+        ];
         
         // Add filters to query
         $params['body']['query']['filtered']['filter'] = $filters;
