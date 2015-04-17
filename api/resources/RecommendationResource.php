@@ -1,13 +1,25 @@
 <?php namespace DMA\Recommendations\API\Resources;
 
 use Response;
-use Controller;
+use Illuminate\Routing\Controller;
 use Recommendation;
 use RainLab\User\Models\User;
 
+use DMA\Friends\Classes\API\AdditionalRoutesTrait;
+
 class RecommendationResource extends Controller {
     
-    public function getSuggest($item, $user, $limit=null)
+    use AdditionalRoutesTrait;
+    
+    public function __construct()
+    {
+        // Add additional routes to Activity resource
+        $this->addAdditionalRoute('suggest', 'suggest/{item}/{user}',           ['GET']);
+        $this->addAdditionalRoute('suggest', 'suggest/{item}/{user}/{limit}',   ['GET']);
+    }
+    
+    
+    public function suggest($item, $user, $limit=null)
     {
         try{
             $item = strtolower($item);
@@ -21,7 +33,13 @@ class RecommendationResource extends Controller {
                     'activity'  => '\DMA\Friends\API\Transformers\ActivityTransformer'
                 ], $item, null);
                 
-                $data = $result[$item];
+                // Check if result is empty, this could happend because the user doesn't have
+                // any activity recorded yet. If that is the case get Items by weight
+                if (count(array_get($result, $item, [])) == 0){
+                    $result = Recommendation::getItemsByWeight($user, [$item], $limit);
+                }
+                
+                $data = array_get($result, $item, []);
                 
                 if (!is_null($transformer)){
                     $data = Response::api()->withCollection($data, new $transformer);
