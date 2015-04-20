@@ -68,7 +68,8 @@ class BadgeItem extends ItemBase
 	{
 	    return [
 	        ['users',      'type' => 'string', 'index' => 'not_analyzed'],   
-            'categories',
+		    ['activities', 'type' => 'string', 'index' => 'not_analyzed'],
+            ['categories', 'type' => 'string', 'index' => 'not_analyzed'],
 	    ];
 	}
 
@@ -103,6 +104,7 @@ class BadgeItem extends ItemBase
 	{
 	    return [
 	       'users' => '\DMA\Recommendations\Classes\Items\UserItem',
+           'activities' => '\DMA\Recommendations\Classes\Items\ActivityItem',
 	    ];
 	}	
 	
