@@ -68,7 +68,7 @@ class BadgeItem extends ItemBase
 	{
 	    return [
 	        ['users',      'type' => 'string', 'index' => 'not_analyzed'],   
-		    ['steps',	   'type' => 'string', 'index' => 'not_analyzed'],
+		    ['activities', 'type' => 'string', 'index' => 'not_analyzed'],
             ['categories', 'type' => 'string', 'index' => 'not_analyzed'],
 	    ];
 	}
@@ -103,8 +103,8 @@ class BadgeItem extends ItemBase
 	public function getItemRelations()
 	{
 	    return [
-	       'users' => '\DMA\Recommendations\Classes\Items\UserItem',
-           'steps' => '\DMA\Recommendations\Classes\Items\Step',
+	       'users'      => '\DMA\Recommendations\Classes\Items\UserItem',
+           'activities' => '\DMA\Recommendations\Classes\Items\Step',
 	    ];
 	}	
 	
@@ -146,6 +146,15 @@ class BadgeItem extends ItemBase
 		});
 		return $clean;
 	
+	}
+
+	public function getActivities($model)
+	{
+		$activities = [];
+		$model->steps->each(function($r) use (&$activities) {
+			$activities[] = $r->activity->id;
+		});
+		return $activities;
 	}
 
 	public function getIsActive($model)

@@ -260,7 +260,12 @@ class ElasticSearchBackend extends BackendBase
         // Get combine results of requested items
         $result = [];
         foreach($itemKeys as $key){
-            $col = $this->collaborativeFiltering($user, $key, $limit, $filterstr);
+            if ($key == 'activity') {
+                $col = $this->recommendationsByBadge($user, $limit, $filterstr);
+            }
+            else {
+                $col = $this->collaborativeFiltering($user, $key, $limit, $filterstr);
+            }
             $result[$key] = $col;
         } 
         return $result;
@@ -968,6 +973,213 @@ class ElasticSearchBackend extends BackendBase
         }
     
         return $relData;
+    }
+
+    /**
+     * Get a list of completed activities, grouped by weight for the specified user.
+     * Each activity is weighted by engagement level. This list is used both to find and
+     * score activities when recommending by badge.
+     * 
+     * @return array Array of weight=>[activity_id1, activity_id2, ...] arrays or empty array if user has no completed activities
+     */
+    private function activitiesCompletedByWeight($user) {
+        if (is_null($user)) return [];
+
+        $user_id = $user->getKey();
+
+        // Begin constructing an elasticsearch query
+        $query = [
+            'index' => $this->index,
+            'type'  => 'activity',
+            'body' => [
+                'from'      => 0,
+                'size'      => 100,
+                '_source'   => false,
+            ],
+        ];
+
+        // Start with the function_score query which serves as parent to everything else
+        $query['body']['query'] = [
+            'function_score' => [
+                'functions'     => [],
+                'filter'        => [],
+                'score_mode'    => 'first',
+            ],
+        ];
+
+        // Establish what function we're using for score calculation
+        // Pretty simple: Just using the engagement field of the activity
+        $query['body']['query']['function_score']['functions'][] = [
+            'field_value_factor' => [
+                'field'     => "activity_fields.engagement",
+                'factor'    => 1,
+                'modifier'  => 'none',
+            ],
+        ];
+
+        // Use a filter to pull activities the user has completed already
+        $query['body']['query']['function_score']['filter'] = [
+            'terms' => [
+                '_id' => [
+                    'index' => 'friends',
+                    'type'  => 'user',
+                    'path'  => 'activities',
+                    'id'    => $user_id,
+                ],
+            ],
+        ];
+
+        // Execute query and capture results
+        $results = $this->search($query);
+
+        // If no hits, we're done here
+        if (!isset($results['hits']) || $results['hits']['total'] <= 0) {
+            return [];
+        }
+
+        // Create list of activity IDs grouped by weight
+        $list_by_weight = [];
+
+        $data = $results['hits']['hits'];
+
+        foreach ($data as $result) {
+            $score = (int) $result['_score'];
+
+            if (!array_key_exists($score, $list_by_weight)) {
+                $list_by_weight[$score] = [];
+            }
+
+            $list_by_weight[$score][] = $result['_id'];
+        }
+
+        return $list_by_weight;
+    }
+
+    /**
+     * Get a list of recommended activities based on partially complete badges.
+     * Score the results based on the weight of the completed activities
+     * 
+     * @param  [type] $user                 [description]
+     * @param  [type] $limit                [description]
+     * @param  [type] $filterstr            [description]
+     * @return [type]                       [description]
+     */
+    public function recommendationsByBadge($user, $limit=null, $filterstr=null) {
+        if (is_null($user)) return [];
+
+        $user_id = $user->getKey();
+
+        $limitSetting = 'activity_max_recomendations';
+        $limit = (is_null($limit)) ? Settings::get($limitSetting, 5): $limit;
+
+        $activities_by_weight = $this->activitiesCompletedByWeight($user);
+
+        if (empty($activities_by_weight)) return [];
+        
+        $completed = [];    // All already completed activity IDs
+        $functions = [];    // Array of scoring functions for use in function_score query
+
+        // Create array of all completed activities for this user
+        // AND create set of scoring functions for each weight of activities
+        foreach ($activities_by_weight as $weight => $activities) {
+            $completed = array_merge($completed, $activities);
+            $functions[] = [
+                'weight' => $weight,
+                'filter' => [
+                    'fquery' => [
+                        'query' => [
+                            'more_like_this' => [
+                                'fields' => ['badges'],
+                                'min_term_freq' => 1,
+                                'min_doc_freq' => 1,
+                                'max_query_terms' => 12,
+                                'ids' => $activities,
+                            ],
+                        ],
+                        '_cache' => true, // Safe to cache because not necessarily linked to user account
+                    ],
+                ],
+            ];
+        }
+
+        // No reason to have duplicate ids in the $completed array
+        // Make sure values strings and not ints or elastic gets unhappy
+        $completed = array_map('strval', array_unique($completed));
+
+        // Construct filters
+        $filters = [
+            'and' => [
+                '_cache'  => false,
+                'filters' => [],
+            ],
+        ];
+
+        // Filter out activities the user has already completed
+        $filters['and']['filters'][] = [
+            'not' => [
+                'terms' => [
+                    '_id' => [
+                        'index'     => $this->index,
+                        'type'      => 'user',
+                        'path'      => 'activities',
+                        'id'        => $user_id,
+                    ],
+                    'execution' => 'bool',
+                ],
+                '_cache' => false, // Users' current items change. Don't cache.
+            ],
+        ];
+
+        // Enabled filters (time restrictions, active)
+        $it =  array_get($this->items, 'activity', null);
+        $itemfilters = $this->getItemFilters($it);
+        foreach($itemfilters as $filter) {
+            $filters['and']['filters'][] = $filter; 
+        }
+
+        // Filters passed from the interface ($filterstr)
+        $parsed_filters = json_decode($filterstr, true);
+        if ($filterstr && is_array($parsed_filters['categories'])) {
+            $filters['and']['filters'][] = [
+                'terms' => [
+                    'categories' => $parsed_filters['categories'],
+                ],
+            ];
+        }
+
+        // Build the query: Executes faster when scoring functions applied to already filtered list, rather than filtering scored list.
+        $query = [
+            'index' => $this->index,
+            'type'  => 'activity',
+            'body'  => [
+                'from'    => 0,
+                'size'    => $limit,
+                '_source' => false,
+                'query'   => [
+                    'function_score' => [
+                        'functions' => $functions,
+                        'query' => [
+                            'filtered' => [
+                                'query' => [
+                                    'more_like_this' => [
+                                        'fields' => ['badges'],
+                                        'min_term_freq' => 1,
+                                        'min_doc_freq' => 1,
+                                        'max_query_terms' => 12,
+                                        'ids' => $completed,
+                                    ],
+                                ],
+                                'filter' => $filters,
+                            ],
+                        ],
+                        'score_mode' => 'sum',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->search($query);
+        return $this->parseResult($result, true);
     }
     
 }

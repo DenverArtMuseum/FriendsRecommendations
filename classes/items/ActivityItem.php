@@ -74,8 +74,9 @@ class ActivityItem extends ItemBase
 	{
 		return [
 		    ['users',      'type' => 'string', 'index' => 'not_analyzed'],  
-            ['steps',      'type' => 'string', 'index' => 'not_analyzed'],
+            ['badges',     'type' => 'string', 'index' => 'not_analyzed'],
             ['categories', 'type' => 'string', 'index' => 'not_analyzed'],
+            ['activity_fields', 'type' => 'object'],
 		];
 	}	
 
@@ -110,8 +111,8 @@ class ActivityItem extends ItemBase
 	public function getItemRelations()
 	{	    
 	    return [
-	       'users' => '\DMA\Recommendations\Classes\Items\UserItem',
-           'steps' => '\DMA\Recommendations\Classes\Items\Step',
+	       'users'              => '\DMA\Recommendations\Classes\Items\UserItem',
+           'badges'             => '\DMA\Recommendations\Classes\Items\Badge',
 	    ];
 	}
 
@@ -232,6 +233,46 @@ class ActivityItem extends ItemBase
 
 	    return $restrictions;
 	}
+
+    public function getActivityFields($model)
+    {
+        $fields = [];
+
+        $fields['duration'] = $model->activity_fields->duration;
+
+        $engagement = $model->activity_fields->engagement;
+
+        if ($engagement) {
+            $fields['engagement'] = (int) $engagement;
+        }
+        else {
+            $fields['engagement'] = 1;
+        }
+
+        $start_time = $this->normalizeTime($model->activity_fields->start_time);
+        if ($start_time == '00:00:00') {
+            $fields['start_time'] = null;
+        }
+        else {
+            $fields['start_time'] = $start_time;
+        }
+
+        $fields['ticketed'] = $model->activity_fields->ticketed == 0 ? false : true;
+        //$fields['ticketed'] = $model->activity_fields->ticketed;
+
+        return $fields;
+    }
+
+    public function getBadges($model)
+    {
+        $badges = [];
+
+        $model->steps->each(function($r) use (&$badges) {
+            $badges[] = $r->badge->id;
+        });
+
+        return $badges;
+    }
 	
     protected function carbonToIso($carbonDate, $bit=null)
     {
