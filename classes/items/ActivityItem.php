@@ -138,7 +138,7 @@ class ActivityItem extends ItemBase
 		return [
 		  'dma.friends.activity.completed',
 		  'eloquent.created: ' . $k,
-		  'eloquent.updated: ' . $k   
+		  'eloquent.updated: ' . $k
         ];
 	}	
 		

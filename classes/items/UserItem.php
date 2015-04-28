@@ -109,6 +109,8 @@ class UserItem extends ItemBase
 	 */
 	public function getUpdateEvents()
 	{
-		return [];
+		return [
+            'dma.friends.activity.completed',
+        ];
 	}	
 }
