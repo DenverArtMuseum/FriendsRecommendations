@@ -1065,7 +1065,7 @@ class ElasticSearchBackend extends BackendBase
      * @return [type]                       [description]
      */
     public function recommendationsByBadge($user, $limit=null, $filterstr=null) {
-        if (is_null($user)) return [];
+        if (is_null($user)) return new Collection([]);
 
         $user_id = $user->getKey();
 
@@ -1074,7 +1074,7 @@ class ElasticSearchBackend extends BackendBase
 
         $activities_by_weight = $this->activitiesCompletedByWeight($user);
 
-        if (empty($activities_by_weight)) return [];
+        if (empty($activities_by_weight)) return new Collection([]);
         
         $completed = [];    // All already completed activity IDs
         $functions = [];    // Array of scoring functions for use in function_score query

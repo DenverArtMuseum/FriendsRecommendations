@@ -95,8 +95,8 @@ class Recommendations extends ComponentBase
         // Fill empty result if required
         $ifEmpty = $this->property('ifEmpty');
         
-        $recomended = array_get($result, $key, new Collection([]));
-        $size = $recomended->count();
+        $recommended = array_get($result, $key, new Collection([]));
+        $size = $recommended->count();
         
         if ($ifEmpty != self::EMPTY_NOTHING && $size < $limit){
             $fill = $limit - $size;
@@ -121,8 +121,8 @@ class Recommendations extends ComponentBase
             
             // Fill results
             $complete = array_get($result, $key, new Collection([]));
-            $recomended = $recomended->merge($complete);
-            $result[$key] = $recomended->unique();
+            $recommended = $recommended->merge($complete);
+            $result[$key] = $recommended->unique();
             
         }
 
