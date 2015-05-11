@@ -398,7 +398,10 @@ class ElasticSearchBackend extends BackendBase
                     ]
                 ]],
         ];
-         
+        
+        // Filter out activities the user has chosen to ignore
+        $filters['and'][] = $this->getIgnoredFilter($user->getKey());
+
         // Filters
         $itemfilters = $this->getItemFilters($it);
         foreach($itemfilters as $filter) {
@@ -407,13 +410,9 @@ class ElasticSearchBackend extends BackendBase
         
         // Process the $filterstr passed by ActivityFilters (if exists),
         // construct query appropriately
-        $parsed_filters = json_decode($filterstr,true);
-        if ($parsed_filters && is_array($parsed_filters['categories'])) {
-            $filters['and'][] = [
-                'terms' => [
-                    'categories' => [$parsed_filters['categories']]
-                ]
-            ];
+        $categoryFilter = $this->getCategoryFilter($filterstr);
+        if (!empty($categoryFilter)) {
+            $filters['and'][] = $categoryFilter;
         }
                
         // Add filters to query
@@ -916,6 +915,67 @@ class ElasticSearchBackend extends BackendBase
     }
 
     /**
+     * Get ElasticSearch filter to remove activities the user has already completed
+     * @param  int   $user_id User id
+     * @return array          resultant filter structure
+     */
+    protected function getCompletedFilter($user_id) {
+        $filter = [
+            'not' => [
+                'term' => [
+                    'users' => strval($user_id),
+                ],
+                '_cache' => false, // Users' current items change. Don't cache
+            ],
+        ];
+
+        return $filter;
+    }
+
+    /**
+     * Get ElasticSearch filter to remove activities the user has chosen to ignore
+     * @param  int   $user_id User ID
+     * @return array          resultant filter structure
+     */
+    protected function getIgnoredFilter($user_id) {
+        $filter = [
+            'not' => [
+                'terms' => [
+                    '_id' => [
+                        'index'     => $this->index,
+                        'type'      => 'user',
+                        'path'      => 'ignored',
+                        'id'        => $user_id,
+                    ],
+                    'execution' => 'bool',
+                ],
+                '_cache' => false, // Users' current items change. Don't cache.
+            ],
+        ];
+
+        return $filter;
+    }
+
+    /**
+     * Get ElasticSearch filter for categories selected by user
+     * @param  string $filterstr JSON filter data from submitted data
+     * @return array             ES query structure or empty array if no filter to be added
+     */
+    protected function getCategoryFilter($filterstr) {
+        $filter = [];
+        $parsed_filters = json_decode($filterstr, true);
+        if ($filterstr && is_array($parsed_filters['categories'])) {
+            $filter = [
+                'terms' => [
+                    'categories' => $parsed_filters['categories'],
+                ],
+            ];
+        }
+
+        return $filter;
+    }
+
+    /**
      * Get user data of the relationships with other
      * Recomendation Items.
      *
@@ -1115,20 +1175,10 @@ class ElasticSearchBackend extends BackendBase
         ];
 
         // Filter out activities the user has already completed
-        $filters['and']['filters'][] = [
-            'not' => [
-                'terms' => [
-                    '_id' => [
-                        'index'     => $this->index,
-                        'type'      => 'user',
-                        'path'      => 'activities',
-                        'id'        => $user_id,
-                    ],
-                    'execution' => 'bool',
-                ],
-                '_cache' => false, // Users' current items change. Don't cache.
-            ],
-        ];
+        $filters['and']['filters'][] = $this->getCompletedFilter($user_id);
+
+        // Filter out activities the user has chosen to ignore
+        $filters['and']['filters'][] = $this->getIgnoredFilter($user_id);
 
         // Enabled filters (time restrictions, active)
         $it =  array_get($this->items, 'activity', null);
@@ -1138,13 +1188,9 @@ class ElasticSearchBackend extends BackendBase
         }
 
         // Filters passed from the interface ($filterstr)
-        $parsed_filters = json_decode($filterstr, true);
-        if ($filterstr && is_array($parsed_filters['categories'])) {
-            $filters['and']['filters'][] = [
-                'terms' => [
-                    'categories' => $parsed_filters['categories'],
-                ],
-            ];
+        $categoryFilter = $this->getCategoryFilter($filterstr);
+        if (!empty($categoryFilter)) {
+            $filters['and']['filters'][] = $categoryFilter;
         }
 
         // Build the query: Executes faster when scoring functions applied to already filtered list, rather than filtering scored list.
