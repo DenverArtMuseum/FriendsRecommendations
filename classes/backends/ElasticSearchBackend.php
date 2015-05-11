@@ -737,7 +737,7 @@ class ElasticSearchBackend extends BackendBase
     	    }catch(\Exception $e){
     	        if($silence){
     	           $this->client = null;
-    	           \Log::critical('Can connect ElasticSearch host with this details', $params);
+    	           \Log::critical('Cannot connect ElasticSearch host with this details', $params);
     	        }else{
     	            throw $e;
     	        }

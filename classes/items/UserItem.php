@@ -68,6 +68,7 @@ class UserItem extends ItemBase
 	{
 		return [
 		    ['activities', 'type' => 'string', 'index' => 'not_analyzed'],
+            ['ignored',    'type' => 'string', 'index' => 'not_analyzed'],
 		    ['badges',     'type' => 'string', 'index' => 'not_analyzed'],
 		];
 	}	
@@ -99,6 +100,7 @@ class UserItem extends ItemBase
 	{
 	    return [
             'activities' => '\DMA\Recommendations\Classes\Items\ActivityItem',
+            'ignored'    => '\DMA\Recommendations\Classes\Items\ActivityItem',
             'badges'     => '\DMA\Recommendations\Classes\Items\BadgeItem',
 	    ];
 	}
@@ -109,8 +111,26 @@ class UserItem extends ItemBase
 	 */
 	public function getUpdateEvents()
 	{
+        // Replace User update event(s) with appropriate update trigger from activity rating
+        $k = $this->getModel();
+        $k = (substr( $k, 0, 1 ) === "\\") ? substr($k, 1, strlen($k)) : $k;
 		return [
             'dma.friends.activity.completed',
+            'eloquent.created: ' . $k,
+            'eloquent.updated: ' . $k
         ];
 	}	
+
+    public function getIgnored($model) {
+        $ignored = [];
+
+        $model->ratings->each(function($r) use (&$ignored) {
+            if ($r->rating <= 0) {
+                $ignored[] = $r->activity->id;
+            }
+        });
+
+        return $ignored;
+    }
+
 }
