@@ -383,21 +383,7 @@ class ElasticSearchBackend extends BackendBase
          
         // Use ElasticSearch terms lookup mechanism
         $filters = [];
-        $filters['and'] = [                 
-                // Exclude user current Items
-                ['not' => [ 'terms' => [
-                    '_id' => [
-                        'index' => $this->index,
-                        'type'  => 'user',
-                        'id'    => $user->getKey(),
-                        'path'  => $reverseRelField,
-                        'cache' => false
-                    ],
-                    'execution' => 'bool',
-                    '_cache'    => false
-                    ]
-                ]],
-        ];
+        $filters['and'][] = $this->getCompletedFilter($user->getKey());
         
         // Filter out activities the user has chosen to ignore
         $filters['and'][] = $this->getIgnoredFilter($user->getKey());
