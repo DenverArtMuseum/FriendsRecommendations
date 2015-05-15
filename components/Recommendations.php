@@ -96,7 +96,17 @@ class Recommendations extends ComponentBase
         $ifEmpty = $this->property('ifEmpty');
         
         $recommended = array_get($result, $key, new Collection([]));
-        $size = $recommended->count();
+        $this->page['recommendation_size'] = $size = $recommended->count();
+        
+        if ($size <= 0) {
+            $this->page['emptyRecommendations'] = true;
+        }
+        else if ($size < $limit) {
+            $this->page['mixedRecommendations'] = true;
+        }
+        else {
+            $this->page['fullRecommendations'] = true;
+        }
         
         if ($ifEmpty != self::EMPTY_NOTHING && $size < $limit){
             $fill = $limit - $size;

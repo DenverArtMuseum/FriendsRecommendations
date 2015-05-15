@@ -1029,7 +1029,9 @@ class ElasticSearchBackend extends BackendBase
      * @return array Array of weight=>[activity_id1, activity_id2, ...] arrays or empty array if user has no completed activities
      */
     private function activitiesCompletedByWeight($user) {
-        if (is_null($user)) return [];
+        if (is_null($user)) { 
+            return [];
+        }
 
         $user_id = $user->getKey();
 
@@ -1065,13 +1067,8 @@ class ElasticSearchBackend extends BackendBase
 
         // Use a filter to pull activities the user has completed already
         $query['body']['query']['function_score']['filter'] = [
-            'terms' => [
-                '_id' => [
-                    'index' => 'friends',
-                    'type'  => 'user',
-                    'path'  => 'activities',
-                    'id'    => $user_id,
-                ],
+            'term' => [
+                'users' => $user_id,
             ],
         ];
 
@@ -1111,7 +1108,9 @@ class ElasticSearchBackend extends BackendBase
      * @return [type]                       [description]
      */
     public function recommendationsByBadge($user, $limit=null, $filterstr=null) {
-        if (is_null($user)) return new Collection([]);
+        if (is_null($user)) { 
+            return new Collection([]);
+        }
 
         $user_id = $user->getKey();
 
@@ -1120,8 +1119,10 @@ class ElasticSearchBackend extends BackendBase
 
         $activities_by_weight = $this->activitiesCompletedByWeight($user);
 
-        if (empty($activities_by_weight)) return new Collection([]);
-        
+        if (empty($activities_by_weight)) {
+            return new Collection([]);
+        }
+
         $completed = [];    // All already completed activity IDs
         $functions = [];    // Array of scoring functions for use in function_score query
 
