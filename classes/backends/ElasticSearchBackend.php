@@ -386,7 +386,7 @@ class ElasticSearchBackend extends BackendBase
         $filters['and'][] = $this->getCompletedFilter($user->getKey());
         
         // Filter out activities the user has chosen to ignore
-        $filters['and'][] = $this->getIgnoredFilter($user->getKey());
+        $filters['and'][] = $this->getIgnoredFilter($user);
 
         // Filters
         $itemfilters = $this->getItemFilters($it);
@@ -923,19 +923,20 @@ class ElasticSearchBackend extends BackendBase
      * @param  int   $user_id User ID
      * @return array          resultant filter structure
      */
-    protected function getIgnoredFilter($user_id) {
+    protected function getIgnoredFilter($user) {
+        // Get list of ignored activities
+        $ignored = $user->ratings;
+        $ids = [];
+        foreach ($ignored as $activity) {
+            $ids[] = (string) $activity->activity_id;
+        }
+
         $filter = [
             'not' => [
-                'terms' => [
-                    '_id' => [
-                        'index'     => $this->index,
-                        'type'      => 'user',
-                        'path'      => 'ignored',
-                        'id'        => $user_id,
-                    ],
-                    'execution' => 'bool',
+                'ids' => [
+                    'values' => $ids,
                 ],
-                '_cache' => false, // Users' current items change. Don't cache.
+                '_cache' => false,
             ],
         ];
 
@@ -1165,7 +1166,7 @@ class ElasticSearchBackend extends BackendBase
         $filters['and']['filters'][] = $this->getCompletedFilter($user_id);
 
         // Filter out activities the user has chosen to ignore
-        $filters['and']['filters'][] = $this->getIgnoredFilter($user_id);
+        $filters['and']['filters'][] = $this->getIgnoredFilter($user);
 
         // Enabled filters (time restrictions, active)
         $it =  array_get($this->items, 'activity', null);
